@@ -88,18 +88,37 @@ class Board:
 
     def place_mines(self, safe_col: int, safe_row: int) -> None:
         # TODO: Place mines randomly, guaranteeing the first click and its neighbors are safe. And Compute adjacency counts
-        # all_positions = [(c, r) for r in range(self.rows) for c in range(self.cols)]
-        # forbidden = {(safe_col, safe_row)} | set(self.neighbors(safe_col, safe_row))
-        # pool = [p for p in all_positions if p not in forbidden]
-        # random.shuffle(pool)
+        # 지뢰 배치 좌표 목록
+        all_positions = [(c, r) for r in range(self.rows) for c in range(self.cols)]
+        # 맨 처음 클릭한 셸의 좌표와 이웃 셸을 금지 구역 설정
+        forbidden = {(safe_col, safe_row)} | set(self.neighbors(safe_col, safe_row))
+        # 그 외 지뢰를 둘 수 있는 셸 리스트
+        pool = [p for p in all_positions if p not in forbidden]
+        random.shuffle(pool)
+
+        # 지뢰 둘 위치 선택
+        mine_positions = pool[:self.num_mines]
         
-        # Compute adjacency counts
-        # for r in range(self.rows):
-        #     for c in range(self.cols):
-
-        # self._mines_placed = True
-
-        pass
+        # 지뢰 적용
+        for c, r in mine_positions:
+            self.cells[self.index(c, r)].state.is_mine = True
+       
+       # Compute adjacency counts ( 인접한 지뢰 수 계산 )
+        for r in range(self.rows):
+            for c in range(self.cols):
+                cell = self.cells[self.index(c,r)] # cell 객체 반환
+                
+                 # 지뢰가 아닌 셀에 대해서만 계산
+                if not cell.state.is_mine:
+                    mine_count = 0
+                    # 주변 8칸 순회
+                    for nc, nr in self.neighbors(c, r):
+                        # 이웃 셀이 지뢰인지 확인
+                        if self.cells[self.index(nc, nr)].state.is_mine:
+                            mine_count += 1
+                    cell.state.adjacent = mine_count
+        
+        self._mines_placed = True
 
     def reveal(self, col: int, row: int) -> None:
         # TODO: Reveal a cell; if zero-adjacent, iteratively flood to neighbors.
