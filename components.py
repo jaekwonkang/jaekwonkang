@@ -72,15 +72,19 @@ class Board:
 
     def neighbors(self, col: int, row: int) -> List[Tuple[int, int]]:
         # TODO: Return list of valid neighboring coordinates around (col,row).
-        # deltas = [
-        #     (-1, -1), (0, -1), (1, -1),
-        #     (-1, 0),            (1, 0),
-        #     (-1, 1),  (0, 1),  (1, 1),
-        # ]
-        # result = []
-        
-        # return result
-        pass
+        deltas = [
+            (-1, -1), (0, -1), (1, -1),
+            (-1, 0),            (1, 0),
+            (-1, 1),  (0, 1),  (1, 1),
+        ]
+        result = []
+        for c,r in deltas:
+            n_c = col + c 
+            n_r = row + r
+            # 범위 체크
+            if self.is_inbounds(n_c,n_r):
+                result.append((n_c,n_r))
+        return result
 
     def place_mines(self, safe_col: int, safe_row: int) -> None:
         # TODO: Place mines randomly, guaranteeing the first click and its neighbors are safe. And Compute adjacency counts
