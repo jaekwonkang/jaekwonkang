@@ -41,14 +41,22 @@ color_grid = (60, 64, 67)
 color_cell_hidden = (40, 44, 52)
 color_cell_revealed = (225, 228, 232)
 color_cell_mine = (220, 0, 0)
-color_flag = (255, 215, 0)
+flag_color_options = {
+    "Red": (220,0,0),
+    "Orange": (255,140,0),
+    "Yellow": (255,255,0),
+    "Green": (50,205,50)
+}#선택 가능한 깃발 색상 리스트(빨강,주황,노랑,녹색)
+color_flag = flag_color_options["Red"]#기본값(빨강)으로 변경
 color_text = (20, 20, 20)
 color_text_inv = (240, 240, 240)
 color_header_text = (240, 240, 240)
 color_header = (32, 34, 36)
 color_highlight = (70, 130, 180)
 color_result = (242, 242, 0)
-
+#체크박스 UI 관련 설정
+checkbox_size = 18
+checkbox_gap = 70
 # Number colors 1~8
 number_colors = {
     1: (25, 118, 210),   # blue

@@ -82,8 +82,25 @@ class Renderer:
         right_text = f"Time: {time_text}"
         left_label = self.header_font.render(left_text, True, config.color_header_text)
         right_label = self.header_font.render(right_text, True, config.color_header_text)
-        self.screen.blit(left_label, (10, 12))
-        self.screen.blit(right_label, (config.width - right_label.get_width() - 10, 12))
+        self.screen.blit(left_label, (10, 5))
+        self.screen.blit(right_label, (config.width - right_label.get_width() - 10, 5))
+        #깃발 색상 선택 체크박스
+        start_x = 20
+        y_pos = 35
+        for i, (name, color) in enumerate(config.flag_color_options.items()):
+            cb_rect = Rect(start_x + (i * config.checkbox_gap), y_pos, config.checkbox_size, config.checkbox_size)
+            
+            # 체크박스 테두리
+            pygame.draw.rect(self.screen, (200, 200, 200), cb_rect, 2)
+            
+            # 현재 선택된 색상이면 채우기 (체크 표시 대용)
+            if config.color_flag == color:
+                pygame.draw.rect(self.screen, color, cb_rect.inflate(-6, -6))
+            
+            # 색상 이름 텍스트
+            color_label = self.font.render(name, True, config.color_header_text) # 첫 글자만 표시하거나 작게 표시
+            self.screen.blit(color_label, (cb_rect.right + 5, y_pos - 2))
+
 
     def draw_result_overlay(self, text: str | None) -> None:
         """Draw a semi-transparent overlay with centered result text, if any."""
@@ -117,14 +134,31 @@ class InputController:
 
     def handle_mouse(self, pos, button) -> None:
         # TODO: Handle mouse button events: left=reveal, right=flag, middle=neighbor highlight  in here
-        col, row = self.pos_to_grid(pos[0], pos[1])
-        if col == -1:
-            return
         game = self.game
-        
-        # 좌클릭(1)
+         #체크박스 클릭시 색상변경
+        if pos[1] < config.margin_top:
+            if button == config.mouse_left:
+                start_x = 20
+                y_pos = 35
+                for i, (name, color) in enumerate(config.flag_color_options.items()):
+                    # 클릭 판정 영역 (너비 70으로 넉넉히 잡아야 글자 부분 클릭이 됨)
+                    click_area = Rect(start_x + (i * config.checkbox_gap), y_pos, 70, 25)
+                    
+                    if click_area.collidepoint(pos):
+                        config.color_flag = color  # 색상 변경
+                        return  # 성공 시 여기서 함수 종료 (아래 지뢰판 로직 실행 방지)
+            return # 헤더 영역이면 지뢰판 로직을 실행하지 않고 종료
+        col, row = self.pos_to_grid(pos[0], pos[1])
+        if col == -1: return
+
+        # 좌클릭(1)수정
         if button == config.mouse_left:
             game.highlight_targets.clear()
+            if not game.started:
+                game.started = True
+                game.start_ticks_ms = pygame.time.get_ticks()
+            game.board.reveal(col, row)
+
 
         # 게임이 시작 x      
             if not game.started:
@@ -139,13 +173,13 @@ class InputController:
         
         # 휠(2)
         elif button == config.mouse_middle:
-                neighbors = game.board.neighbors(col,row)
-                game.highlight_targets = {
-                    # 공개된 셸 여부 확인
-                    (nc, nr) for (nc, nr) in neighbors if not game.board.cells[game.board.index(nc, nr)].state.is_revealed
-                }
-        
-                game.highlight_until_ms = pygame.time.get_ticks() + config.highlight_duration_ms
+            neighbors = game.board.neighbors(col, row)
+            game.highlight_targets = {
+                (nc, nr) for (nc, nr) in neighbors 
+                if not game.board.cells[game.board.index(nc, nr)].state.is_revealed
+            }
+            game.highlight_until_ms = pygame.time.get_ticks() + config.highlight_duration_ms
+
 
 class Game:
     """Main application object orchestrating loop and high-level state."""
