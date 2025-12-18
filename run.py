@@ -197,6 +197,8 @@ class Game:
         self.started = False
         self.start_ticks_ms = 0
         self.end_ticks_ms = 0
+        self.paused = False #일시정지 상태 변수
+        self.paused_start_ticks = 0# 정지된 시점의 시간 기록
 
     def reset(self):
         """Reset the game state and start a new board."""
@@ -207,6 +209,9 @@ class Game:
         self.started = False
         self.start_ticks_ms = 0
         self.end_ticks_ms = 0
+        self.paused = False
+        self.paused_start_ticks = 0
+
 
     def _elapsed_ms(self) -> int:
         """Return elapsed time in milliseconds (stops when game ends)."""
@@ -214,6 +219,10 @@ class Game:
             return 0
         if self.end_ticks_ms:
             return self.end_ticks_ms - self.start_ticks_ms
+        #일시정지 중이라면 정지 버튼을 누른 시점까지만 계산
+        if self.paused:
+            return self.paused_start_ticks - self.start_ticks_ms
+
         return pygame.time.get_ticks() - self.start_ticks_ms
 
     def _format_time(self, ms: int) -> str:
@@ -244,7 +253,10 @@ class Game:
             for c in range(self.board.cols):
                 highlighted = (now <= self.highlight_until_ms) and ((c, r) in self.highlight_targets)
                 self.renderer.draw_cell(c, r, highlighted)
-        self.renderer.draw_result_overlay(self._result_text())
+        if self.paused:
+            self.renderer.draw_result_overlay("PAUSED")
+        else:
+            self.renderer.draw_result_overlay(self._result_text())
         pygame.display.flip()
 
     def run_step(self) -> bool:
@@ -252,11 +264,23 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
+            #ESC 키를 누르면 일시정지 토글
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:
-                    self.reset()
+                if not self.board.game_over and not self.board.win and self.started:
+                        if not self.paused:
+                            self.paused = True
+                            self.pause_start_ticks = pygame.time.get_ticks()
+
             if event.type == pygame.MOUSEBUTTONDOWN:
-                self.input.handle_mouse(event.pos, event.button)
+                #일시정지 상태일때
+                if self.paused:
+                    if event.button == config.mouse_left:
+                        pause_duration = pygame.time.get_ticks() - self.pause_start_ticks
+                        self.start_ticks_ms += pause_duration
+                        self.paused = False
+                else:
+                    #정지 상태가 아닐 떄만 기존 마우스 핸들러 작동
+                    self.input.handle_mouse(event.pos, event.button)
         if (self.board.game_over or self.board.win) and self.started and not self.end_ticks_ms:
             self.end_ticks_ms = pygame.time.get_ticks()
         self.draw()
