@@ -39,6 +39,7 @@ display_dimension = (width, height)
 color_bg = (24, 26, 27)
 color_grid = (60, 64, 67)
 color_cell_hidden = (40, 44, 52)
+color_cell_hover = (25,28,35)# 마우스 오버 시 적용할 조금 더 어두운은 색상
 color_cell_revealed = (225, 228, 232)
 color_cell_mine = (220, 0, 0)
 flag_color_options = {

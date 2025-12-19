@@ -38,7 +38,7 @@ class Renderer:
         y = config.margin_top + row * config.cell_size
         return Rect(x, y, config.cell_size, config.cell_size)
 
-    def draw_cell(self, col: int, row: int, highlighted: bool) -> None:
+    def draw_cell(self, col: int, row: int, highlighted: bool,is_hover: bool) -> None:
         """Draw a single cell, respecting revealed/flagged state and highlight."""
         cell = self.board.cells[self.board.index(col, row)]
         rect = self.cell_rect(col, row)
@@ -52,7 +52,13 @@ class Renderer:
                 label_rect = label.get_rect(center=rect.center)
                 self.screen.blit(label, label_rect)
         else:
-            base_color = config.color_highlight if highlighted else config.color_cell_hidden
+           # base_color = config.color_highlight if highlighted else config.color_cell_hidden
+            if highlighted:
+                base_color = config.color_highlight
+            elif is_hover:
+                base_color = config.color_cell_hover # 마우스 올렸을 때 색상
+            else:
+                base_color = config.color_cell_hidden
             pygame.draw.rect(self.screen, base_color, rect)
             if cell.state.is_flagged:
                 flag_w = max(6, rect.width // 3)
@@ -69,6 +75,7 @@ class Renderer:
                         (pole_x + 2, pole_y + flag_h // 2),
                     ],
                 )
+            
         pygame.draw.rect(self.screen, config.color_grid, rect, 1)
 
     def draw_header(self, remaining_mines: int, time_text: str) -> None:
@@ -199,6 +206,7 @@ class Game:
         self.end_ticks_ms = 0
         self.paused = False #일시정지 상태 변수
         self.paused_start_ticks = 0# 정지된 시점의 시간 기록
+        self.hover_pos = (-1, -1)  # 현재 마우스가 위치한 (col, row)
 
     def reset(self):
         """Reset the game state and start a new board."""
@@ -249,10 +257,20 @@ class Game:
         time_text = self._format_time(self._elapsed_ms())
         self.renderer.draw_header(remaining, time_text)
         now = pygame.time.get_ticks()
+      
+        mouse_x,mouse_y = pygame.mouse.get_pos()
+        hover_col,hover_row = self.input.pos_to_grid(mouse_x,mouse_y)
+        
+        
         for r in range(self.board.rows):
             for c in range(self.board.cols):
-                highlighted = (now <= self.highlight_until_ms) and ((c, r) in self.highlight_targets)
-                self.renderer.draw_cell(c, r, highlighted)
+                #미들 클릭 하이라이트 확인
+                now = pygame.time.get_ticks()
+                is_mid_highlight = (now <= self.highlight_until_ms) and ((c, r) in self.highlight_targets)
+                #마우스 오버 하이라이트 확인
+                
+                is_hover = (c == hover_col and r == hover_row)
+                self.renderer.draw_cell(c, r, is_mid_highlight,is_hover)
         if self.paused:
             self.renderer.draw_result_overlay("PAUSED")
         else:
