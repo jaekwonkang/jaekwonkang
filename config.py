@@ -55,6 +55,7 @@ color_header_text = (240, 240, 240)
 color_header = (32, 34, 36)
 color_highlight = (70, 130, 180)
 color_result = (242, 242, 0)
+color_highscore = (0,255,255) #하늘색 최고기록
 #체크박스 UI 관련 설정
 checkbox_size = 18
 checkbox_gap = 70

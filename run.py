@@ -118,17 +118,30 @@ class Renderer:
         self.screen.blit(hint_label, hint_label.get_rect(center=hint_rect.center))
 
 
-    def draw_result_overlay(self, text: str | None) -> None:
+    def draw_result_overlay(self, text: str | None, current_time: str, high_score_ms: int, is_new:bool) -> None:
         """Draw a semi-transparent overlay with centered result text, if any."""
         if not text:
             return
         overlay = pygame.Surface((config.width, config.height), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, config.result_overlay_alpha))
         self.screen.blit(overlay, (0, 0))
-        label = self.result_font.render(text, True, config.color_result)
-        rect = label.get_rect(center=(config.width // 2, config.height // 2))
-        self.screen.blit(label, rect)
 
+        label = self.result_font.render(text, True, config.color_result)
+        rect = label.get_rect(center=(config.width // 2, config.height // 2 -40))
+        self.screen.blit(label, rect)
+        #현재 기록 표시
+        score_label = self.font.render(f"Your Time: {current_time}", True, (255, 255, 255))
+        score_rect = score_label.get_rect(center=(config.width // 2, config.height // 2 + 30))
+        self.screen.blit(score_label, score_rect)
+        #이번 세션 최고 기록 표시
+        if high_score_ms is not None:
+            hs_total_sec = high_score_ms // 1000
+            hs_text = f"Best: {hs_total_sec // 60:02d}:{hs_total_sec % 60:02d}"
+            if is_new: hs_text += " (NEW RECORD!)"
+            
+            hs_label = self.font.render(hs_text, True, config.color_highscore)
+            hs_rect = hs_label.get_rect(center=(config.width // 2, config.height // 2 + 70))
+            self.screen.blit(hs_label, hs_rect)
 
 class InputController:
     """Translates input events into game and board actions."""
@@ -238,6 +251,8 @@ class Game:
         self.hover_pos = (-1, -1)  # 현재 마우스가 위치한 (col, row)
         self.hint_pos = (-1,-1) #현재 힌트로 선택된(col,row)
         self.hint_until_ms=0 #힌트를 표시할 종료 시간
+        self.session_high_score = None #이번 실행 중 최고 기록
+        self.new_record = False
 
     def reset(self):
         """Reset the game state and start a new board."""
@@ -250,6 +265,7 @@ class Game:
         self.end_ticks_ms = 0
         self.paused = False
         self.paused_start_ticks = 0
+        self.new_record = False
 
 
     def _elapsed_ms(self) -> int:
@@ -308,7 +324,17 @@ class Game:
         if self.paused:
             self.renderer.draw_result_overlay("PAUSED")
         else:
-            self.renderer.draw_result_overlay(self._result_text())
+            res_text = self._result_text() # "GAME CLEAR" 등 가져오기
+            if res_text:
+                current_time_str = self._format_time(self._elapsed_ms()) # 현재 시간 문자열
+                self.renderer.draw_result_overlay(
+                    res_text, 
+                    current_time_str, 
+                    self.session_high_score, # Game.__init__에 추가되어 있어야 함
+                    self.new_record          # Game.__init__에 추가되어 있어야 함
+                )
+
+       
         pygame.display.flip()
 
     def run_step(self) -> bool:
@@ -335,6 +361,12 @@ class Game:
                     self.input.handle_mouse(event.pos, event.button)
         if (self.board.game_over or self.board.win) and self.started and not self.end_ticks_ms:
             self.end_ticks_ms = pygame.time.get_ticks()
+            current_score = self.end_ticks_ms - self.start_ticks_ms
+
+            #첫 승리이거나 기존 기록보다 빠를때
+            if self.session_high_score is None or current_score < self.session_high_score:
+                self.session_high_score = current_score
+                self.new_record = True
         self.draw()
         self.clock.tick(config.fps)
         return True
