@@ -301,40 +301,34 @@ class Game:
             self.highlight_targets.clear()
         self.screen.fill(config.color_bg)
         remaining = max(0, config.num_mines - self.board.flagged_count())
-        self.renderer.draw_header(remaining, self._format_time(self._elapsed_ms()))
         time_text = self._format_time(self._elapsed_ms())
         self.renderer.draw_header(remaining, time_text)
-        now = pygame.time.get_ticks()
-      
-        mouse_x,mouse_y = pygame.mouse.get_pos()
-        hover_col,hover_row = self.input.pos_to_grid(mouse_x,mouse_y)
         
+        now = pygame.time.get_ticks()
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        hover_col, hover_row = self.input.pos_to_grid(mouse_x, mouse_y)
         
         for r in range(self.board.rows):
             for c in range(self.board.cols):
-                #미들 클릭 하이라이트 확인
-                now = pygame.time.get_ticks()
                 is_mid_highlight = (now <= self.highlight_until_ms) and ((c, r) in self.highlight_targets)
-                #힌트 하이라이트(현재 시간보다 힌트 종료 시간이 뒤일 때)
-                is_hint = (now <= self.hint_until_ms)and(c == self.hint_pos[0] and r== self.hint_pos[1])
-                #마우스 오버 하이라이트 확인
-                
+                is_hint = (now <= self.hint_until_ms) and (c == self.hint_pos[0] and r == self.hint_pos[1])
                 is_hover = (c == hover_col and r == hover_row)
-                self.renderer.draw_cell(c, r, is_mid_highlight,is_hover,is_hint)
+                self.renderer.draw_cell(c, r, is_mid_highlight, is_hover, is_hint)
+
+        # 아래 로직에서 인자 개수 4개를 반드시 맞춰야 안 터집니다.
         if self.paused:
-            self.renderer.draw_result_overlay("PAUSED")
+            self.renderer.draw_result_overlay("PAUSED", time_text, self.session_high_score, False)
         else:
-            res_text = self._result_text() # "GAME CLEAR" 등 가져오기
+            res_text = self._result_text() 
             if res_text:
-                current_time_str = self._format_time(self._elapsed_ms()) # 현재 시간 문자열
+                current_time_str = self._format_time(self._elapsed_ms())
                 self.renderer.draw_result_overlay(
                     res_text, 
                     current_time_str, 
-                    self.session_high_score, # Game.__init__에 추가되어 있어야 함
-                    self.new_record          # Game.__init__에 추가되어 있어야 함
+                    self.session_high_score, 
+                    self.new_record
                 )
-
-       
+        
         pygame.display.flip()
 
     def run_step(self) -> bool:
@@ -342,31 +336,44 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
-            #ESC 키를 누르면 일시정지 토글
+            
+            # 1. 키보드 입력 처리
             if event.type == pygame.KEYDOWN:
-                if not self.board.game_over and not self.board.win and self.started:
+                # 반드시 ESC 키인지 확인하는 조건이 있어야 함
+                if event.key == pygame.K_ESCAPE: 
+                    # 게임이 진행 중일 때만 일시정지 가능
+                    if self.started and not self.board.game_over and not self.board.win:
                         if not self.paused:
+                            # 일시정지 시작: 현재 시간을 기록
                             self.paused = True
-                            self.pause_start_ticks = pygame.time.get_ticks()
-
+                            self.paused_start_ticks = pygame.time.get_ticks()
+                        else:
+                            # 일시정지 해제: 정지되어 있던 시간만큼 시작 시간을 뒤로 밀어줌
+                            pause_duration = pygame.time.get_ticks() - self.paused_start_ticks
+                            self.start_ticks_ms += pause_duration
+                            self.paused = False
+                elif event.key == pygame.K_r:
+                    self.reset()
+            # 2. 마우스 입력 처리
             if event.type == pygame.MOUSEBUTTONDOWN:
-                #일시정지 상태일때
                 if self.paused:
-                    if event.button == config.mouse_left:
-                        pause_duration = pygame.time.get_ticks() - self.pause_start_ticks
-                        self.start_ticks_ms += pause_duration
-                        self.paused = False
+                    # 일시정지 중 클릭하면 해제 (옵션)
+                    pause_duration = pygame.time.get_ticks() - self.paused_start_ticks
+                    self.start_ticks_ms += pause_duration
+                    self.paused = False
                 else:
-                    #정지 상태가 아닐 떄만 기존 마우스 핸들러 작동
+                    # 정상 게임 중일 때만 마우스 조작 허용
                     self.input.handle_mouse(event.pos, event.button)
+
+        # 3. 게임 종료 시점 기록
         if (self.board.game_over or self.board.win) and self.started and not self.end_ticks_ms:
             self.end_ticks_ms = pygame.time.get_ticks()
             current_score = self.end_ticks_ms - self.start_ticks_ms
 
-            #첫 승리이거나 기존 기록보다 빠를때
             if self.session_high_score is None or current_score < self.session_high_score:
                 self.session_high_score = current_score
                 self.new_record = True
+
         self.draw()
         self.clock.tick(config.fps)
         return True
