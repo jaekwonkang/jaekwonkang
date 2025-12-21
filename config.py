@@ -39,6 +39,7 @@ display_dimension = (width, height)
 color_bg = (24, 26, 27)
 color_grid = (60, 64, 67)
 color_cell_hidden = (40, 44, 52)
+color_cell_hover = (25,28,35)# 마우스 오버 시 적용할 조금 더 어두운은 색상
 color_cell_revealed = (225, 228, 232)
 color_cell_mine = (220, 0, 0)
 flag_color_options = {
@@ -68,6 +69,14 @@ number_colors = {
     7: (85, 85, 85),     # gray
     8: (0, 0, 0),        # black
 }
+color_hint = (50,205,50)
+color_hint_button = (100,100,100)
+
+#힌트 버튼 위치(상단바 오른쪽 적당한 곳)
+hint_button_x = width - 220
+hint_button_y = 35
+hint_button_w = 80
+hint_button_h =25
 
 # Text / UI
 font_name = None  # default pygame font

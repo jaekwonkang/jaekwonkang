@@ -16,6 +16,7 @@ import pygame
 import config
 from components import Board
 from pygame.locals import Rect
+import random
 
 
 class Renderer:
@@ -38,7 +39,7 @@ class Renderer:
         y = config.margin_top + row * config.cell_size
         return Rect(x, y, config.cell_size, config.cell_size)
 
-    def draw_cell(self, col: int, row: int, highlighted: bool) -> None:
+    def draw_cell(self, col: int, row: int, highlighted: bool,is_hover: bool,is_hint: bool) -> None:
         """Draw a single cell, respecting revealed/flagged state and highlight."""
         cell = self.board.cells[self.board.index(col, row)]
         rect = self.cell_rect(col, row)
@@ -52,7 +53,15 @@ class Renderer:
                 label_rect = label.get_rect(center=rect.center)
                 self.screen.blit(label, label_rect)
         else:
-            base_color = config.color_highlight if highlighted else config.color_cell_hidden
+           # base_color = config.color_highlight if highlighted else config.color_cell_hidden
+            if is_hint:
+                base_color = config.color_hint
+            elif highlighted:
+                base_color = config.color_highlight
+            elif is_hover:
+                base_color = config.color_cell_hover # 마우스 올렸을 때 색상
+            else:
+                base_color = config.color_cell_hidden
             pygame.draw.rect(self.screen, base_color, rect)
             if cell.state.is_flagged:
                 flag_w = max(6, rect.width // 3)
@@ -69,6 +78,7 @@ class Renderer:
                         (pole_x + 2, pole_y + flag_h // 2),
                     ],
                 )
+            
         pygame.draw.rect(self.screen, config.color_grid, rect, 1)
 
     def draw_header(self, remaining_mines: int, time_text: str) -> None:
@@ -100,6 +110,12 @@ class Renderer:
             # 색상 이름 텍스트
             color_label = self.font.render(name, True, config.color_header_text) # 첫 글자만 표시하거나 작게 표시
             self.screen.blit(color_label, (cb_rect.right + 5, y_pos - 2))
+        hint_rect = Rect(config.hint_button_x, config.hint_button_y, config.hint_button_w, config.hint_button_h)
+        pygame.draw.rect(self.screen, config.color_hint_button, hint_rect)
+        pygame.draw.rect(self.screen, (200, 200, 200), hint_rect, 2) # 테두리
+        
+        hint_label = self.font.render("HINT", True, config.color_header_text)
+        self.screen.blit(hint_label, hint_label.get_rect(center=hint_rect.center))
 
 
     def draw_result_overlay(self, text: str | None) -> None:
@@ -138,6 +154,11 @@ class InputController:
          #체크박스 클릭시 색상변경
         if pos[1] < config.margin_top:
             if button == config.mouse_left:
+                #힌트버튼 클릭 확인
+                hint_rect = Rect(config.hint_button_x,config.hint_button_y,config.hint_button_w,config.hint_button_h)
+                if hint_rect.collidepoint(pos) and game.started and not game.paused:
+                    self.give_hint()
+                    return
                 start_x = 20
                 y_pos = 35
                 for i, (name, color) in enumerate(config.flag_color_options.items()):
@@ -179,7 +200,22 @@ class InputController:
                 if not game.board.cells[game.board.index(nc, nr)].state.is_revealed
             }
             game.highlight_until_ms = pygame.time.get_ticks() + config.highlight_duration_ms
-
+    def give_hint(self):
+        """지뢰가 없는 닫힌 칸 하나를 찾아 힌트로 표시합니다."""
+        game = self.game
+        safe_cells = []
+        
+        for r in range(game.board.rows):
+            for c in range(game.board.cols):
+                cell = game.board.cells[game.board.index(c, r)]
+                # 지뢰가 아니고, 열리지 않았고, 깃발도 안 꽂힌 칸 수집
+                if not cell.state.is_mine and not cell.state.is_revealed and not cell.state.is_flagged:
+                    safe_cells.append((c, r))
+        
+        if safe_cells:
+            game.hint_pos = random.choice(safe_cells)
+            # 1초(1000ms) 동안 힌트 표시
+            game.hint_until_ms = pygame.time.get_ticks() + 1000
 
 class Game:
     """Main application object orchestrating loop and high-level state."""
@@ -199,6 +235,9 @@ class Game:
         self.end_ticks_ms = 0
         self.paused = False #일시정지 상태 변수
         self.paused_start_ticks = 0# 정지된 시점의 시간 기록
+        self.hover_pos = (-1, -1)  # 현재 마우스가 위치한 (col, row)
+        self.hint_pos = (-1,-1) #현재 힌트로 선택된(col,row)
+        self.hint_until_ms=0 #힌트를 표시할 종료 시간
 
     def reset(self):
         """Reset the game state and start a new board."""
@@ -246,13 +285,26 @@ class Game:
             self.highlight_targets.clear()
         self.screen.fill(config.color_bg)
         remaining = max(0, config.num_mines - self.board.flagged_count())
+        self.renderer.draw_header(remaining, self._format_time(self._elapsed_ms()))
         time_text = self._format_time(self._elapsed_ms())
         self.renderer.draw_header(remaining, time_text)
         now = pygame.time.get_ticks()
+      
+        mouse_x,mouse_y = pygame.mouse.get_pos()
+        hover_col,hover_row = self.input.pos_to_grid(mouse_x,mouse_y)
+        
+        
         for r in range(self.board.rows):
             for c in range(self.board.cols):
-                highlighted = (now <= self.highlight_until_ms) and ((c, r) in self.highlight_targets)
-                self.renderer.draw_cell(c, r, highlighted)
+                #미들 클릭 하이라이트 확인
+                now = pygame.time.get_ticks()
+                is_mid_highlight = (now <= self.highlight_until_ms) and ((c, r) in self.highlight_targets)
+                #힌트 하이라이트(현재 시간보다 힌트 종료 시간이 뒤일 때)
+                is_hint = (now <= self.hint_until_ms)and(c == self.hint_pos[0] and r== self.hint_pos[1])
+                #마우스 오버 하이라이트 확인
+                
+                is_hover = (c == hover_col and r == hover_row)
+                self.renderer.draw_cell(c, r, is_mid_highlight,is_hover,is_hint)
         if self.paused:
             self.renderer.draw_result_overlay("PAUSED")
         else:
